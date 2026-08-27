@@ -2,205 +2,241 @@ package com.pixelassistant.chess
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
+import android.graphics.*
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import android.provider.Settings
+import android.view.MotionEvent
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
+import kotlin.math.*
 
-class MainActivity : AppCompatActivity() {
+class OverlayView(context: Context) : View(context) {
+    private val darkBlue = Color.parseColor("#0B132B")
+    private val lightBlue = Color.parseColor("#4CC9F0")
+    private val glassBg = Color.argb(180, 11, 19, 43)
 
-    private lateinit var sharedPrefs: SharedPreferences
-    private lateinit var usernameInput: EditText
-    private lateinit var saveUsernameBtn: Button
-    private lateinit var accessibilityStatus: TextView
-    private lateinit var enableAccessibilityBtn: Button
-    private lateinit var toggleFeaturesBtn: Button
-    private lateinit var startBtn: Button
+    var showArrows = true
+    var showEvalOnTap = true
+    var isMinimized = false
+    var isMenuOpen = false
 
-    private var showArrows = true
-    private var showEvalOnTap = true
-    private var autoRematch = true
+    var topArrows = listOf<Pair<Pair<Float, Float>, Pair<Float, Float>>>()
+    var threatRects = listOf<RectF>()
+    var evalOverlays = mutableMapOf<Pair<Float, Float>, String>()
+    var boardRect = Rect()
+    var boardFlipped = false
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+    var onPieceTapped: ((String) -> Unit)? = null
+    var onHomeClicked: (() -> Unit)? = null
+    var onGameReviewClicked: (() -> Unit)? = null
 
-        sharedPrefs = getSharedPreferences("ChessAssistantPrefs", Context.MODE_PRIVATE)
-
-        // Bind views
-        usernameInput = findViewById(R.id.usernameInput)
-        saveUsernameBtn = findViewById(R.id.saveUsernameBtn)
-        accessibilityStatus = findViewById(R.id.accessibilityStatus)
-        enableAccessibilityBtn = findViewById(R.id.enableAccessibilityBtn)
-        toggleFeaturesBtn = findViewById(R.id.toggleFeaturesBtn)
-        startBtn = findViewById(R.id.startBtn)
-
-        // Handle Game Review intent from menu
-        if (intent.getBooleanExtra("openGameReview", false)) {
-            showGameReviewDialog()
-        }
-
-        // Load saved username
-        val savedUsername = sharedPrefs.getString("username", "")
-        if (!savedUsername.isNullOrEmpty()) {
-            usernameInput.setText(savedUsername)
-            usernameInput.isEnabled = false
-            saveUsernameBtn.text = "Username Saved"
-            saveUsernameBtn.isEnabled = false
-        }
-
-        // Username save logic
-        saveUsernameBtn.setOnClickListener {
-            val username = usernameInput.text.toString().trim()
-            if (username.isEmpty()) {
-                Toast.makeText(this, "Please enter a username", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            sharedPrefs.edit().putString("username", username).apply()
-            usernameInput.isEnabled = false
-            saveUsernameBtn.text = "Username Saved"
-            saveUsernameBtn.isEnabled = false
-            Toast.makeText(this, "Username saved!", Toast.LENGTH_SHORT).show()
-            updateUI()
-        }
-
-        // Accessibility button
-        enableAccessibilityBtn.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
-
-        // Toggle Features button
-        toggleFeaturesBtn.setOnClickListener {
-            showFeatureToggleDialog()
-        }
-
-        // Start button
-        startBtn.setOnClickListener {
-            startOverlayAndLaunchChess()
-        }
-
-        // Initial UI update
-        updateUI()
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 40f
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
     }
 
-    private fun updateUI() {
-        val accessibilityEnabled = isAccessibilityEnabled()
-        if (accessibilityEnabled) {
-            accessibilityStatus.text = "✅ Accessibility: ON"
-            accessibilityStatus.setTextColor(0xFF00FF00.toInt())
-        } else {
-            accessibilityStatus.text = "❌ Accessibility: OFF (Please enable)"
-            accessibilityStatus.setTextColor(0xFFFF4444.toInt())
-        }
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
 
-        val username = sharedPrefs.getString("username", "")
-        if (username.isNullOrEmpty()) {
-            toggleFeaturesBtn.isEnabled = false
-            startBtn.isEnabled = false
-        } else if (!isAccessibilityEnabled()) {
-            toggleFeaturesBtn.isEnabled = false
-            startBtn.isEnabled = false
-        } else {
-            toggleFeaturesBtn.isEnabled = true
-            startBtn.isEnabled = true
-        }
-    }
-
-    private fun isAccessibilityEnabled(): Boolean {
-        val service = "com.pixelassistant.chess/com.pixelassistant.chess.ChessService"
-        return try {
-            val enabledServices = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            )
-            enabledServices?.contains(service) == true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun showFeatureToggleDialog() {
-        val checkedItems = booleanArrayOf(showArrows, showEvalOnTap, autoRematch)
-        val items = arrayOf("Show Arrows", "Show Eval on Tap", "Auto-Rematch")
-
-        AlertDialog.Builder(this)
-            .setTitle("Toggle Features")
-            .setMultiChoiceItems(items, checkedItems) { _, which, isChecked ->
-                when (which) {
-                    0 -> showArrows = isChecked
-                    1 -> showEvalOnTap = isChecked
-                    2 -> autoRematch = isChecked
-                }
-            }
-            .setPositiveButton("Save") { _, _ ->
-                sharedPrefs.edit().putBoolean("showArrows", showArrows).apply()
-                sharedPrefs.edit().putBoolean("showEvalOnTap", showEvalOnTap).apply()
-                sharedPrefs.edit().putBoolean("autoRematch", autoRematch).apply()
-                Toast.makeText(this, "Features updated!", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun startOverlayAndLaunchChess() {
-        showArrows = sharedPrefs.getBoolean("showArrows", true)
-        showEvalOnTap = sharedPrefs.getBoolean("showEvalOnTap", true)
-        autoRematch = sharedPrefs.getBoolean("autoRematch", true)
-
-        val serviceIntent = Intent(this, ChessService::class.java)
-        serviceIntent.putExtra("showArrows", showArrows)
-        serviceIntent.putExtra("showEvalOnTap", showEvalOnTap)
-        serviceIntent.putExtra("autoRematch", autoRematch)
-        startService(serviceIntent)
-
-        // Launch Chess.com app or website
-        try {
-            val chessIntent = packageManager.getLaunchIntentForPackage("com.chess")
-            if (chessIntent != null) {
-                startActivity(chessIntent)
-            } else {
-                Toast.makeText(this, "Chess.com app not found. Opening website.", Toast.LENGTH_LONG).show()
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chess.com"))
-                startActivity(browserIntent)
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error launching Chess.com", Toast.LENGTH_SHORT).show()
-        }
-
-        moveTaskToBack(true)
-    }
-
-    private fun showGameReviewDialog() {
-        val username = sharedPrefs.getString("username", "")
-        if (username.isNullOrEmpty()) {
-            Toast.makeText(this, "Please set a username first", Toast.LENGTH_SHORT).show()
+        if (isMinimized) {
+            drawMinimizedPill(canvas)
             return
         }
 
-        // Placeholder - implement actual API call later
-        AlertDialog.Builder(this)
-            .setTitle("Game Review")
-            .setMessage("Fetching games for $username...\n\nAPI integration coming soon!")
-            .setPositiveButton("OK", null)
-            .show()
+        canvas.drawColor(glassBg)
+
+        val navPaint = Paint().apply { color = darkBlue }
+        canvas.drawRect(0f, 0f, width.toFloat(), 80f, navPaint)
+        textPaint.color = lightBlue
+        textPaint.textSize = 50f
+        canvas.drawText("♛ Chess Assistant", 60f, 55f, textPaint)
+
+        // Three-dots menu button (top-left)
+        val dotsPaint = Paint().apply { color = lightBlue; style = Paint.Style.FILL }
+        canvas.drawCircle(40f, 40f, 25f, dotsPaint)
+        textPaint.color = darkBlue
+        textPaint.textSize = 30f
+        canvas.drawText("⋮", 30f, 50f, textPaint)
+
+        drawToggle(canvas, "Arrows", 300f, 20f, showArrows)
+        drawToggle(canvas, "Eval", 500f, 20f, showEvalOnTap)
+        drawToggle(canvas, "Auto-Rematch", 700f, 20f, true)
+
+        val minPaint = Paint().apply { color = lightBlue }
+        canvas.drawCircle(width - 60f, 40f, 30f, minPaint)
+        textPaint.color = darkBlue
+        textPaint.textSize = 40f
+        canvas.drawText("−", width - 70f, 55f, textPaint)
+
+        if (isMenuOpen) {
+            drawMenu(canvas)
+        }
+
+        if (showArrows) {
+            topArrows.forEachIndexed { idx, arrow ->
+                val (start, end) = arrow
+                val (x1, y1) = start
+                val (x2, y2) = end
+                val color = when (idx) {
+                    0 -> Color.GREEN
+                    1 -> Color.YELLOW
+                    else -> Color.argb(255, 255, 165, 0)
+                }
+                paint.color = color
+                paint.strokeWidth = 15f
+                canvas.drawLine(x1, y1, x2, y2, paint)
+                val angle = atan2(y2 - y1, x2 - x1)
+                val headLen = 40f
+                canvas.drawLine(x2, y2,
+                    x2 - headLen * cos(angle - 0.5).toFloat(),
+                    y2 - headLen * sin(angle - 0.5).toFloat(), paint)
+                canvas.drawLine(x2, y2,
+                    x2 - headLen * cos(angle + 0.5).toFloat(),
+                    y2 - headLen * sin(angle + 0.5).toFloat(), paint)
+            }
+        }
+
+        threatRects.forEach { rect ->
+            paint.color = Color.argb(100, 255, 0, 0)
+            canvas.drawRect(rect, paint)
+        }
+
+        if (showEvalOnTap) {
+            evalOverlays.forEach { (coords, text) ->
+                val (x, y) = coords
+                paint.color = darkBlue
+                paint.alpha = 220
+                canvas.drawRoundRect(x - 50f, y - 30f, x + 50f, y + 30f, 20f, 20f, paint)
+                paint.color = lightBlue
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 4f
+                canvas.drawRoundRect(x - 50f, y - 30f, x + 50f, y + 30f, 20f, 20f, paint)
+                paint.style = Paint.Style.FILL
+                textPaint.color = if (text.startsWith("M")) Color.YELLOW else Color.WHITE
+                textPaint.textSize = 35f
+                canvas.drawText(text, x - 30f, y + 12f, textPaint)
+            }
+        }
     }
 
-    // Called from layout click
-    fun openYouTube(view: View) {
+    private fun drawMenu(canvas: Canvas) {
+        val menuBg = Paint().apply {
+            color = darkBlue
+            alpha = 240
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(10f, 90f, 250f, 300f, 20f, 20f, menuBg)
+
+        val borderPaint = Paint().apply {
+            color = lightBlue
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        canvas.drawRoundRect(10f, 90f, 250f, 300f, 20f, 20f, borderPaint)
+
+        textPaint.color = Color.WHITE
+        textPaint.textSize = 32f
+
+        canvas.drawText("🏠 Home", 30f, 140f, textPaint)
+        canvas.drawText("📊 Game Review", 30f, 200f, textPaint)
+        canvas.drawText("🎬 Credits", 30f, 260f, textPaint)
+    }
+
+    private fun drawToggle(canvas: Canvas, label: String, x: Float, y: Float, isOn: Boolean) {
+        val paint = Paint().apply {
+            color = if (isOn) lightBlue else Color.GRAY
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(x, y, x + 80f, y + 40f, 20f, 20f, paint)
+        textPaint.color = darkBlue
+        textPaint.textSize = 25f
+        canvas.drawText(if (isOn) "ON" else "OFF", x + 15f, y + 28f, textPaint)
+    }
+
+    private fun drawMinimizedPill(canvas: Canvas) {
+        paint.color = lightBlue
+        canvas.drawRoundRect(width / 2 - 100f, 20f, width / 2 + 100f, 80f, 40f, 40f, paint)
+        textPaint.color = darkBlue
+        textPaint.textSize = 30f
+        canvas.drawText("♛ OPEN", width / 2 - 55f, 60f, textPaint)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_DOWN) {
+            val x = event.x
+            val y = event.y
+
+            // Three-dots menu
+            if (x in 15f..65f && y in 15f..65f) {
+                isMenuOpen = !isMenuOpen
+                invalidate()
+                return true
+            }
+
+            // Menu click handling
+            if (isMenuOpen) {
+                if (x in 10f..250f && y in 90f..300f) {
+                    if (y in 90f..160f) {
+                        isMenuOpen = false
+                        onHomeClicked?.invoke()
+                        invalidate()
+                        return true
+                    } else if (y in 160f..230f) {
+                        isMenuOpen = false
+                        onGameReviewClicked?.invoke()
+                        invalidate()
+                        return true
+                    } else if (y in 230f..300f) {
+                        isMenuOpen = false
+                        showCredits()
+                        invalidate()
+                        return true
+                    }
+                }
+                // Click outside closes menu
+                isMenuOpen = false
+                invalidate()
+                return true
+            }
+
+            if (x > width - 100f && y < 80f) {
+                isMinimized = true
+                invalidate()
+                return true
+            }
+
+            if (isMinimized) {
+                if (x > width / 2 - 150f && x < width / 2 + 150f && y > 20f && y < 80f) {
+                    isMinimized = false
+                    invalidate()
+                }
+                return true
+            }
+
+            if (boardRect.width() > 0) {
+                val stepX = boardRect.width() / 8f
+                val stepY = boardRect.height() / 8f
+                if (x > boardRect.left && x < boardRect.right && y > boardRect.top && y < boardRect.bottom) {
+                    val file = ((x - boardRect.left) / stepX).toInt()
+                    val rank = if (!boardFlipped) 7 - ((y - boardRect.top) / stepY).toInt() else ((y - boardRect.top) / stepY).toInt()
+                    if (file in 0..7 && rank in 0..7) {
+                        val square = "${'a' + file}${rank + 1}"
+                        onPieceTapped?.invoke(square)
+                        return true
+                    }
+                }
+            }
+
+            if (y in 20f..60f) {
+                if (x in 300f..380f) { showArrows = !showArrows; invalidate(); return true }
+                if (x in 500f..580f) { showEvalOnTap = !showEvalOnTap; invalidate(); return true }
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+
+    private fun showCredits() {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/@pixeld3v"))
-        startActivity(intent)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        updateUI()
+        context.startActivity(intent)
     }
 }
