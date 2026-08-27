@@ -31,86 +31,111 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        sharedPrefs = getSharedPreferences("ChessAssistantPrefs", Context.MODE_PRIVATE)
-
-        // Bind views
-        usernameInput = findViewById(R.id.usernameInput)
-        saveUsernameBtn = findViewById(R.id.saveUsernameBtn)
-        accessibilityStatus = findViewById(R.id.accessibilityStatus)
-        enableAccessibilityBtn = findViewById(R.id.enableAccessibilityBtn)
-        toggleFeaturesBtn = findViewById(R.id.toggleFeaturesBtn)
-        startBtn = findViewById(R.id.startBtn)
-
-        // Handle Game Review intent from menu
-        if (intent.getBooleanExtra("openGameReview", false)) {
-            showGameReviewDialog()
+        
+        try {
+            setContentView(R.layout.activity_main)
+        } catch (e: Exception) {
+            // Show the error in a popup
+            AlertDialog.Builder(this)
+                .setTitle("❌ Layout Error")
+                .setMessage("Failed to load layout:\n${e.message}\n\nCheck if activity_main.xml exists.")
+                .setPositiveButton("OK") { _, _ -> finish() }
+                .show()
+            return
         }
 
-        // Load saved username
-        val savedUsername = sharedPrefs.getString("username", "")
-        if (!savedUsername.isNullOrEmpty()) {
-            usernameInput.setText(savedUsername)
-            usernameInput.isEnabled = false
-            saveUsernameBtn.text = "Username Saved"
-            saveUsernameBtn.isEnabled = false
-        }
+        try {
+            sharedPrefs = getSharedPreferences("ChessAssistantPrefs", Context.MODE_PRIVATE)
 
-        // Username save logic
-        saveUsernameBtn.setOnClickListener {
-            val username = usernameInput.text.toString().trim()
-            if (username.isEmpty()) {
-                Toast.makeText(this, "Please enter a username", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+            // Bind views
+            usernameInput = findViewById(R.id.usernameInput)
+            saveUsernameBtn = findViewById(R.id.saveUsernameBtn)
+            accessibilityStatus = findViewById(R.id.accessibilityStatus)
+            enableAccessibilityBtn = findViewById(R.id.enableAccessibilityBtn)
+            toggleFeaturesBtn = findViewById(R.id.toggleFeaturesBtn)
+            startBtn = findViewById(R.id.startBtn)
+
+            // Handle Game Review intent from menu
+            if (intent.getBooleanExtra("openGameReview", false)) {
+                showGameReviewDialog()
             }
-            sharedPrefs.edit().putString("username", username).apply()
-            usernameInput.isEnabled = false
-            saveUsernameBtn.text = "Username Saved"
-            saveUsernameBtn.isEnabled = false
-            Toast.makeText(this, "Username saved!", Toast.LENGTH_SHORT).show()
+
+            // Load saved username
+            val savedUsername = sharedPrefs.getString("username", "")
+            if (!savedUsername.isNullOrEmpty()) {
+                usernameInput.setText(savedUsername)
+                usernameInput.isEnabled = false
+                saveUsernameBtn.text = "Username Saved"
+                saveUsernameBtn.isEnabled = false
+            }
+
+            // Username save logic
+            saveUsernameBtn.setOnClickListener {
+                val username = usernameInput.text.toString().trim()
+                if (username.isEmpty()) {
+                    Toast.makeText(this, "Please enter a username", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                sharedPrefs.edit().putString("username", username).apply()
+                usernameInput.isEnabled = false
+                saveUsernameBtn.text = "Username Saved"
+                saveUsernameBtn.isEnabled = false
+                Toast.makeText(this, "Username saved!", Toast.LENGTH_SHORT).show()
+                updateUI()
+            }
+
+            // Accessibility button
+            enableAccessibilityBtn.setOnClickListener {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+
+            // Toggle Features button
+            toggleFeaturesBtn.setOnClickListener {
+                showFeatureToggleDialog()
+            }
+
+            // Start button
+            startBtn.setOnClickListener {
+                startOverlayAndLaunchChess()
+            }
+
+            // Initial UI update
             updateUI()
+            
+        } catch (e: Exception) {
+            // Show any other errors
+            AlertDialog.Builder(this)
+                .setTitle("❌ App Error")
+                .setMessage("Error: ${e.message}")
+                .setPositiveButton("OK") { _, _ -> finish() }
+                .show()
         }
-
-        // Accessibility button
-        enableAccessibilityBtn.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
-
-        // Toggle Features button
-        toggleFeaturesBtn.setOnClickListener {
-            showFeatureToggleDialog()
-        }
-
-        // Start button
-        startBtn.setOnClickListener {
-            startOverlayAndLaunchChess()
-        }
-
-        // Initial UI update
-        updateUI()
     }
 
     private fun updateUI() {
-        val accessibilityEnabled = isAccessibilityEnabled()
-        if (accessibilityEnabled) {
-            accessibilityStatus.text = "✅ Accessibility: ON"
-            accessibilityStatus.setTextColor(0xFF00FF00.toInt())
-        } else {
-            accessibilityStatus.text = "❌ Accessibility: OFF (Please enable)"
-            accessibilityStatus.setTextColor(0xFFFF4444.toInt())
-        }
+        try {
+            val accessibilityEnabled = isAccessibilityEnabled()
+            if (accessibilityEnabled) {
+                accessibilityStatus.text = "✅ Accessibility: ON"
+                accessibilityStatus.setTextColor(0xFF00FF00.toInt())
+            } else {
+                accessibilityStatus.text = "❌ Accessibility: OFF (Please enable)"
+                accessibilityStatus.setTextColor(0xFFFF4444.toInt())
+            }
 
-        val username = sharedPrefs.getString("username", "")
-        if (username.isNullOrEmpty()) {
-            toggleFeaturesBtn.isEnabled = false
-            startBtn.isEnabled = false
-        } else if (!isAccessibilityEnabled()) {
-            toggleFeaturesBtn.isEnabled = false
-            startBtn.isEnabled = false
-        } else {
-            toggleFeaturesBtn.isEnabled = true
-            startBtn.isEnabled = true
+            val username = sharedPrefs.getString("username", "")
+            if (username.isNullOrEmpty()) {
+                toggleFeaturesBtn.isEnabled = false
+                startBtn.isEnabled = false
+            } else if (!isAccessibilityEnabled()) {
+                toggleFeaturesBtn.isEnabled = false
+                startBtn.isEnabled = false
+            } else {
+                toggleFeaturesBtn.isEnabled = true
+                startBtn.isEnabled = true
+            }
+        } catch (e: Exception) {
+            // Ignore UI update errors
         }
     }
 
@@ -161,7 +186,6 @@ class MainActivity : AppCompatActivity() {
         serviceIntent.putExtra("autoRematch", autoRematch)
         startService(serviceIntent)
 
-        // Launch Chess.com app or website
         try {
             val chessIntent = packageManager.getLaunchIntentForPackage("com.chess")
             if (chessIntent != null) {
@@ -185,7 +209,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Placeholder - implement actual API call later
         AlertDialog.Builder(this)
             .setTitle("Game Review")
             .setMessage("Fetching games for $username...\n\nAPI integration coming soon!")
@@ -193,7 +216,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // Called from layout click
     fun openYouTube(view: View) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://youtube.com/@pixeld3v"))
         startActivity(intent)
@@ -201,6 +223,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateUI()
+        try { updateUI() } catch (e: Exception) {}
     }
 }
