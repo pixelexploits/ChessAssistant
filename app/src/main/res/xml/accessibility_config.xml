@@ -1,0 +1,6 @@
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewScrolled"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagRequestTouchExplorationMode"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="true" />
