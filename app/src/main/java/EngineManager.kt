@@ -1,7 +1,8 @@
 package com.pixelassistant.chess
 
 import android.content.Context
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class EngineManager(context: Context) {
@@ -10,7 +11,6 @@ class EngineManager(context: Context) {
     private val reader: java.io.BufferedReader
 
     init {
-        // Extract stockfish from assets (do this in init)
         val file = File(context.filesDir, "stockfish")
         if (!file.exists()) {
             context.assets.open("stockfish").use { input ->
@@ -37,7 +37,9 @@ class EngineManager(context: Context) {
                 line = reader.readLine() ?: break
                 if (line.contains("pv")) {
                     val pv = line.substringAfter("pv ").split(" ").first()
-                    moves.add(com.github.bhlangonijr.chesslib.move.Move(pv, null)) // simplified
+                    try {
+                        moves.add(com.github.bhlangonijr.chesslib.move.Move(pv, null))
+                    } catch (_: Exception) {}
                     if (moves.size >= count) break
                 }
                 if (line.contains("bestmove")) break
@@ -70,7 +72,7 @@ class EngineManager(context: Context) {
     }
 
     suspend fun getThreatenedSquares(fen: String): List<String> {
-        // Dummy for now. Use chesslib to check if a square is attacked by opponent with double attack
-        return listOf("e4", "d5") 
+        // Dummy – replace with actual chesslib threat detection later
+        return listOf()
     }
 }
