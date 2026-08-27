@@ -13,12 +13,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Stockfish
+      - name: Create dummy Stockfish file
         run: |
-          wget -O stockfish.tar.gz https://stockfish.s3.amazonaws.com/stockfish-15-android-arm64.tar.gz
-          tar -xzf stockfish.tar.gz
           mkdir -p app/src/main/assets/
-          mv stockfish/stockfish app/src/main/assets/stockfish || true
+          echo "dummy" > app/src/main/assets/stockfish
 
       - name: Make Gradle executable
         run: chmod +x gradlew
