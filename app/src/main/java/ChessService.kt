@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -32,7 +33,6 @@ class ChessService : AccessibilityService() {
         overlayView = OverlayView(this)
         engine = EngineManager(this)
 
-        // Setup overlay params
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -44,16 +44,13 @@ class ChessService : AccessibilityService() {
         )
         windowManager.addView(overlayView, params)
 
-        // Set callback for when user taps a piece
         overlayView.onPieceTapped = { square ->
             analyzeLegalMovesForSquare(square)
         }
 
-        // Start foreground notification
         createNotificationChannel()
         startForeground(1, getNotification())
 
-        // Fetch board bounds after 1 second
         Handler(Looper.getMainLooper()).postDelayed({
             updateBoardBounds()
         }, 1000)
@@ -172,6 +169,3 @@ class ChessService : AccessibilityService() {
         }
     }
 }
-
-// Helper RectF class
-class RectF(var left: Float, var top: Float, var right: Float, var bottom: Float)
