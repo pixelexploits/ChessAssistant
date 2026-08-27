@@ -31,102 +31,71 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        // Global try-catch to catch ANY error
-        try {
-            // Set the layout
-            setContentView(R.layout.activity_main)
+        sharedPrefs = getSharedPreferences("ChessAssistantPrefs", Context.MODE_PRIVATE)
 
-            // Initialize everything
-            sharedPrefs = getSharedPreferences("ChessAssistantPrefs", Context.MODE_PRIVATE)
+        usernameInput = findViewById(R.id.usernameInput)
+        saveUsernameBtn = findViewById(R.id.saveUsernameBtn)
+        accessibilityStatus = findViewById(R.id.accessibilityStatus)
+        enableAccessibilityBtn = findViewById(R.id.enableAccessibilityBtn)
+        toggleFeaturesBtn = findViewById(R.id.toggleFeaturesBtn)
+        startBtn = findViewById(R.id.startBtn)
 
-            usernameInput = findViewById(R.id.usernameInput)
-            saveUsernameBtn = findViewById(R.id.saveUsernameBtn)
-            accessibilityStatus = findViewById(R.id.accessibilityStatus)
-            enableAccessibilityBtn = findViewById(R.id.enableAccessibilityBtn)
-            toggleFeaturesBtn = findViewById(R.id.toggleFeaturesBtn)
-            startBtn = findViewById(R.id.startBtn)
-
-            // Handle Game Review intent
-            if (intent.getBooleanExtra("openGameReview", false)) {
-                showGameReviewDialog()
-            }
-
-            // Load saved username
-            val savedUsername = sharedPrefs.getString("username", "")
-            if (!savedUsername.isNullOrEmpty()) {
-                usernameInput.setText(savedUsername)
-                usernameInput.isEnabled = false
-                saveUsernameBtn.text = "Username Saved"
-                saveUsernameBtn.isEnabled = false
-            }
-
-            // Username save logic
-            saveUsernameBtn.setOnClickListener {
-                val username = usernameInput.text.toString().trim()
-                if (username.isEmpty()) {
-                    Toast.makeText(this, "Please enter a username", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                sharedPrefs.edit().putString("username", username).apply()
-                usernameInput.isEnabled = false
-                saveUsernameBtn.text = "Username Saved"
-                saveUsernameBtn.isEnabled = false
-                Toast.makeText(this, "Username saved!", Toast.LENGTH_SHORT).show()
-                updateUI()
-            }
-
-            // Accessibility button
-            enableAccessibilityBtn.setOnClickListener {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-
-            // Toggle Features button
-            toggleFeaturesBtn.setOnClickListener {
-                showFeatureToggleDialog()
-            }
-
-            // Start button
-            startBtn.setOnClickListener {
-                startOverlayAndLaunchChess()
-            }
-
-            updateUI()
-
-        } catch (e: Exception) {
-            // Show the crash error in a popup
-            AlertDialog.Builder(this)
-                .setTitle("❌ App Crashed")
-                .setMessage("Error: ${e.message}\n\nStack trace:\n${e.stackTraceToString()}")
-                .setPositiveButton("Close") { _, _ -> finish() }
-                .show()
+        val savedUsername = sharedPrefs.getString("username", "")
+        if (!savedUsername.isNullOrEmpty()) {
+            usernameInput.setText(savedUsername)
+            usernameInput.isEnabled = false
+            saveUsernameBtn.text = "Saved ✓"
+            saveUsernameBtn.isEnabled = false
         }
+
+        saveUsernameBtn.setOnClickListener {
+            val username = usernameInput.text.toString().trim()
+            if (username.isEmpty()) {
+                Toast.makeText(this, "Enter a username", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            sharedPrefs.edit().putString("username", username).apply()
+            usernameInput.isEnabled = false
+            saveUsernameBtn.text = "Saved ✓"
+            saveUsernameBtn.isEnabled = false
+            Toast.makeText(this, "Username saved!", Toast.LENGTH_SHORT).show()
+            updateUI()
+        }
+
+        enableAccessibilityBtn.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+
+        toggleFeaturesBtn.setOnClickListener {
+            showFeatureToggleDialog()
+        }
+
+        startBtn.setOnClickListener {
+            startOverlayAndLaunchChess()
+        }
+
+        updateUI()
     }
 
     private fun updateUI() {
-        try {
-            val accessibilityEnabled = isAccessibilityEnabled()
-            if (accessibilityEnabled) {
-                accessibilityStatus.text = "✅ Accessibility: ON"
-                accessibilityStatus.setTextColor(0xFF00FF00.toInt())
-            } else {
-                accessibilityStatus.text = "❌ Accessibility: OFF (Please enable)"
-                accessibilityStatus.setTextColor(0xFFFF4444.toInt())
-            }
+        val accessibilityEnabled = isAccessibilityEnabled()
+        if (accessibilityEnabled) {
+            accessibilityStatus.text = "✅ Accessibility: ON"
+            accessibilityStatus.setTextColor(0xFF00FF00.toInt())
+        } else {
+            accessibilityStatus.text = "❌ Accessibility: OFF"
+            accessibilityStatus.setTextColor(0xFFFF4444.toInt())
+        }
 
-            val username = sharedPrefs.getString("username", "")
-            if (username.isNullOrEmpty()) {
-                toggleFeaturesBtn.isEnabled = false
-                startBtn.isEnabled = false
-            } else if (!isAccessibilityEnabled()) {
-                toggleFeaturesBtn.isEnabled = false
-                startBtn.isEnabled = false
-            } else {
-                toggleFeaturesBtn.isEnabled = true
-                startBtn.isEnabled = true
-            }
-        } catch (e: Exception) {
-            // Ignore UI update errors
+        val username = sharedPrefs.getString("username", "")
+        if (username.isNullOrEmpty() || !isAccessibilityEnabled()) {
+            toggleFeaturesBtn.isEnabled = false
+            startBtn.isEnabled = false
+        } else {
+            toggleFeaturesBtn.isEnabled = true
+            startBtn.isEnabled = true
         }
     }
 
@@ -160,7 +129,7 @@ class MainActivity : AppCompatActivity() {
                 sharedPrefs.edit().putBoolean("showArrows", showArrows).apply()
                 sharedPrefs.edit().putBoolean("showEvalOnTap", showEvalOnTap).apply()
                 sharedPrefs.edit().putBoolean("autoRematch", autoRematch).apply()
-                Toast.makeText(this, "Features updated!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Features saved!", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -182,29 +151,15 @@ class MainActivity : AppCompatActivity() {
             if (chessIntent != null) {
                 startActivity(chessIntent)
             } else {
-                Toast.makeText(this, "Chess.com app not found. Opening website.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Opening Chess.com website", Toast.LENGTH_LONG).show()
                 val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://chess.com"))
                 startActivity(browserIntent)
             }
         } catch (e: Exception) {
-            Toast.makeText(this, "Error launching Chess.com", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Error opening Chess.com", Toast.LENGTH_SHORT).show()
         }
 
         moveTaskToBack(true)
-    }
-
-    private fun showGameReviewDialog() {
-        val username = sharedPrefs.getString("username", "")
-        if (username.isNullOrEmpty()) {
-            Toast.makeText(this, "Please set a username first", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Game Review")
-            .setMessage("Fetching games for $username...\n\nAPI integration coming soon!")
-            .setPositiveButton("OK", null)
-            .show()
     }
 
     fun openYouTube(view: View) {
@@ -214,6 +169,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        try { updateUI() } catch (e: Exception) {}
+        updateUI()
     }
 }
