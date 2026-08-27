@@ -26,3 +26,40 @@ jobs:
         with:
           name: Chess-Assistant
           path: app/build/outputs/apk/debug/*.apk
+name: Build APK
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Create dummy Stockfish file
+        run: |
+          mkdir -p app/src/main/assets/
+          echo "dummy" > app/src/main/assets/stockfish
+
+      - name: Generate Gradle wrapper
+        run: |
+          mkdir -p gradle/wrapper
+          echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.5-bin.zip" > gradle/wrapper/gradle-wrapper.properties
+          echo "dummy" > gradle/wrapper/gradle-wrapper.jar
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chess-Assistant
+          path: app/build/outputs/apk/debug/*.apk
