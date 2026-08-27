@@ -33,12 +33,6 @@ class ChessService : AccessibilityService() {
         overlayView = OverlayView(this)
         engine = EngineManager(this)
 
-        // Load toggles from intent
-        val intent = intent
-        overlayView.showArrows = intent.getBooleanExtra("showArrows", true)
-        overlayView.showEvalOnTap = intent.getBooleanExtra("showEvalOnTap", true)
-        // autoRematch can be stored as a variable
-
         // Menu callbacks
         overlayView.onHomeClicked = {
             stopSelf()
