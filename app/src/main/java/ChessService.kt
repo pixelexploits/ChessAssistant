@@ -6,16 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.app.NotificationCompat
 import com.github.bhlangonijr.chesslib.Board
-import com.github.bhlangonijr.chesslib.move.Move
 import com.github.bhlangonijr.chesslib.Square
+import com.github.bhlangonijr.chesslib.move.Move
 import kotlinx.coroutines.*
 
 class ChessService : AccessibilityService() {
@@ -32,7 +32,7 @@ class ChessService : AccessibilityService() {
         overlayView = OverlayView(this)
         engine = EngineManager(this)
 
-        // Setup overlay params (modern, full screen, not touchable except our view handles touches)
+        // Setup overlay params
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -42,7 +42,6 @@ class ChessService : AccessibilityService() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         )
-        // Allow our view to receive touches even though it's overlaying
         windowManager.addView(overlayView, params)
 
         // Set callback for when user taps a piece
@@ -50,40 +49,46 @@ class ChessService : AccessibilityService() {
             analyzeLegalMovesForSquare(square)
         }
 
-        // Start foreground notification for minimize/restore
-        startForeground(1, createNotification())
+        // Start foreground notification
+        createNotificationChannel()
+        startForeground(1, getNotification())
 
-        // Fetch board bounds and start listening
+        // Fetch board bounds after 1 second
         Handler(Looper.getMainLooper()).postDelayed({
             updateBoardBounds()
         }, 1000)
     }
 
-    private fun createNotification() = NotificationCompat.Builder(this, "CHESS_CH")
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel("CHESS_CH", "Chess Assistant", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
+    }
+
+    private fun getNotification() = NotificationCompat.Builder(this, "CHESS_CH")
         .setContentTitle("Chess Assistant")
         .setContentText("Tap to restore overlay")
         .setSmallIcon(android.R.drawable.ic_menu_edit)
         .setContentIntent(
-            PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         )
         .build()
 
-    // Called when user taps a piece
     private fun analyzeLegalMovesForSquare(squareStr: String) {
         if (!overlayView.showEvalOnTap) return
-        
+
         val square = Square.valueOf(squareStr.uppercase())
         val legalMoves = board.legalMoves().filter { it.from == square }
-        
+
         serviceScope.launch {
             val results = mutableMapOf<Pair<Float, Float>, String>()
             legalMoves.forEach { move ->
-                // Play move on a clone board to get evaluation
                 val clone = Board()
                 clone.loadFromFen(board.fen)
                 clone.doMove(move)
-                val score = engine.getEvaluation(clone.fen) // returns "+1.23" or "M2"
-                // Map destination square to screen coords
+                val score = engine.getEvaluation(clone.fen)
                 val dest = move.to.toString().lowercase()
                 val (x, y) = squareToPixel(dest)
                 results[Pair(x, y)] = score
@@ -91,7 +96,6 @@ class ChessService : AccessibilityService() {
             withContext(Dispatchers.Main) {
                 overlayView.evalOverlays = results
                 overlayView.invalidate()
-                // Clear evals after 3 seconds
                 Handler(Looper.getMainLooper()).postDelayed({
                     overlayView.evalOverlays.clear()
                     overlayView.invalidate()
@@ -101,18 +105,16 @@ class ChessService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Detect move changes (same as before, but parse and update board)
         val root = rootInActiveWindow ?: return
-        val nodes = root.findAccessibilityNodeInfosByViewId("com.lichess.mobileapp:id/move_text") // CHANGE THIS ID
+        // REPLACE THIS ID with actual Lichess move list ID
+        val nodes = root.findAccessibilityNodeInfosByViewId("com.lichess.mobileapp:id/move_text")
         if (nodes.isNotEmpty()) {
             val current = nodes.last().text.toString()
             if (current != lastMoveText) {
                 lastMoveText = current
-                // Parse the move (e.g., "e4", "Nf3") and apply to board
                 try {
                     val moveObj = Move(current, board.sideToMove)
                     board.doMove(moveObj)
-                    // Trigger analysis for arrows
                     runAnalysis()
                 } catch (e: Exception) { }
             }
@@ -126,14 +128,13 @@ class ChessService : AccessibilityService() {
                 overlayView.topArrows = topMoves.map { move ->
                     val from = move.from.toString().lowercase()
                     val to = move.to.toString().lowercase()
-                    val (x1,y1) = squareToPixel(from)
-                    val (x2,y2) = squareToPixel(to)
-                    Triple(x1, y1, x2, y2)
+                    val (x1, y1) = squareToPixel(from)
+                    val (x2, y2) = squareToPixel(to)
+                    Pair(Pair(x1, y1), Pair(x2, y2))
                 }
-                // Run threat detection (check if any move leads to mate/fork)
-                overlayView.threatRects = engine.getThreatenedSquares(board.fen).map { 
-                    val (x,y) = squareToPixel(it.lowercase())
-                    RectF(x-40f, y-40f, x+40f, y+40f) 
+                overlayView.threatRects = engine.getThreatenedSquares(board.fen).map {
+                    val (x, y) = squareToPixel(it.lowercase())
+                    RectF(x - 40f, y - 40f, x + 40f, y + 40f)
                 }
                 overlayView.invalidate()
             }
@@ -142,14 +143,12 @@ class ChessService : AccessibilityService() {
 
     private fun updateBoardBounds() {
         val root = rootInActiveWindow ?: return
-        // CHANGE THIS ID to Lichess/Chess.com board
+        // REPLACE THIS ID with actual Lichess board view ID
         val boardNode = root.findAccessibilityNodeInfosByViewId("com.lichess.mobileapp:id/board_view")
         if (boardNode.isNotEmpty()) {
-            val rect = android.graphics.Rect()
+            val rect = Rect()
             boardNode[0].getBoundsInScreen(rect)
             overlayView.boardRect = rect
-            // Detect flip: check color of a1 square (if it's white, not flipped)
-            overlayView.boardFlipped = false // default
         }
     }
 
@@ -168,6 +167,11 @@ class ChessService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
-        windowManager.removeView(overlayView)
+        if (::windowManager.isInitialized && ::overlayView.isInitialized) {
+            windowManager.removeView(overlayView)
+        }
     }
 }
+
+// Helper RectF class
+class RectF(var left: Float, var top: Float, var right: Float, var bottom: Float)
