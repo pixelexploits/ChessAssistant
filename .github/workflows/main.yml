@@ -13,22 +13,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Gradle 8.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.5
+
       - name: Create dummy Stockfish file
         run: |
           mkdir -p app/src/main/assets/
           echo "dummy" > app/src/main/assets/stockfish
 
-      - name: Generate Gradle wrapper
-        run: |
-          mkdir -p gradle/wrapper
-          echo "distributionUrl=https://services.gradle.org/distributions/gradle-8.5-bin.zip" > gradle/wrapper/gradle-wrapper.properties
-          echo "dummy" > gradle/wrapper/gradle-wrapper.jar
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
       - name: Build APK
-        run: ./gradlew assembleDebug
+        run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
