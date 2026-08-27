@@ -7,18 +7,15 @@ import android.view.View
 import kotlin.math.*
 
 class OverlayView(context: Context) : View(context) {
-    // Colors
     private val darkBlue = Color.parseColor("#0B132B")
     private val lightBlue = Color.parseColor("#4CC9F0")
     private val glassBg = Color.argb(180, 11, 19, 43)
 
-    // State
     var showArrows = true
     var showEvalOnTap = true
     var isMinimized = false
 
-    // Data - using Pair to store 4 floats
-    var topArrows = listOf<Pair<Pair<Float, Float>, Pair<Float, Float>>>() // ((x1,y1),(x2,y2))
+    var topArrows = listOf<Pair<Pair<Float, Float>, Pair<Float, Float>>>()
     var threatRects = listOf<RectF>()
     var evalOverlays = mutableMapOf<Pair<Float, Float>, String>()
     var boardRect = Rect()
@@ -41,29 +38,24 @@ class OverlayView(context: Context) : View(context) {
             return
         }
 
-        // Glass background
         canvas.drawColor(glassBg)
 
-        // Top nav bar
         val navPaint = Paint().apply { color = darkBlue }
         canvas.drawRect(0f, 0f, width.toFloat(), 80f, navPaint)
         textPaint.color = lightBlue
         textPaint.textSize = 50f
         canvas.drawText("♛ Chess Assistant", 20f, 55f, textPaint)
 
-        // Toggles
         drawToggle(canvas, "Arrows", 300f, 20f, showArrows)
         drawToggle(canvas, "Eval", 500f, 20f, showEvalOnTap)
         drawToggle(canvas, "Auto-Rematch", 700f, 20f, true)
 
-        // Minimize button
         val minPaint = Paint().apply { color = lightBlue }
         canvas.drawCircle(width - 60f, 40f, 30f, minPaint)
         textPaint.color = darkBlue
         textPaint.textSize = 40f
         canvas.drawText("−", width - 70f, 55f, textPaint)
 
-        // Arrows
         if (showArrows) {
             topArrows.forEachIndexed { idx, arrow ->
                 val (start, end) = arrow
@@ -79,18 +71,21 @@ class OverlayView(context: Context) : View(context) {
                 canvas.drawLine(x1, y1, x2, y2, paint)
                 val angle = atan2(y2 - y1, x2 - x1)
                 val headLen = 40f
-                canvas.drawLine(x2, y2, x2 - headLen * cos(angle - 0.5), y2 - headLen * sin(angle - 0.5), paint)
-                canvas.drawLine(x2, y2, x2 - headLen * cos(angle + 0.5), y2 - headLen * sin(angle + 0.5), paint)
+                // FIX: convert to Float
+                canvas.drawLine(x2, y2,
+                    x2 - headLen * cos(angle - 0.5).toFloat(),
+                    y2 - headLen * sin(angle - 0.5).toFloat(), paint)
+                canvas.drawLine(x2, y2,
+                    x2 - headLen * cos(angle + 0.5).toFloat(),
+                    y2 - headLen * sin(angle + 0.5).toFloat(), paint)
             }
         }
 
-        // Threat rects - FIXED drawRect
         threatRects.forEach { rect ->
             paint.color = Color.argb(100, 255, 0, 0)
             canvas.drawRect(rect, paint)
         }
 
-        // Eval overlays
         if (showEvalOnTap) {
             evalOverlays.forEach { (coords, text) ->
                 val (x, y) = coords
@@ -133,14 +128,12 @@ class OverlayView(context: Context) : View(context) {
             val x = event.x
             val y = event.y
 
-            // Minimize button
             if (x > width - 100f && y < 80f) {
                 isMinimized = true
                 invalidate()
                 return true
             }
 
-            // Restore from minimized
             if (isMinimized) {
                 if (x > width / 2 - 150f && x < width / 2 + 150f && y > 20f && y < 80f) {
                     isMinimized = false
@@ -149,7 +142,6 @@ class OverlayView(context: Context) : View(context) {
                 return true
             }
 
-            // Detect piece tap
             if (boardRect.width() > 0) {
                 val stepX = boardRect.width() / 8f
                 val stepY = boardRect.height() / 8f
@@ -164,7 +156,6 @@ class OverlayView(context: Context) : View(context) {
                 }
             }
 
-            // Toggle clicks
             if (y in 20f..60f) {
                 if (x in 300f..380f) { showArrows = !showArrows; invalidate(); return true }
                 if (x in 500f..580f) { showEvalOnTap = !showEvalOnTap; invalidate(); return true }
