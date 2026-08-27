@@ -31,23 +31,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        try {
-            setContentView(R.layout.activity_main)
-        } catch (e: Exception) {
-            // Show the error in a popup
-            AlertDialog.Builder(this)
-                .setTitle("❌ Layout Error")
-                .setMessage("Failed to load layout:\n${e.message}\n\nCheck if activity_main.xml exists.")
-                .setPositiveButton("OK") { _, _ -> finish() }
-                .show()
-            return
-        }
 
+        // Global try-catch to catch ANY error
         try {
+            // Set the layout
+            setContentView(R.layout.activity_main)
+
+            // Initialize everything
             sharedPrefs = getSharedPreferences("ChessAssistantPrefs", Context.MODE_PRIVATE)
 
-            // Bind views
             usernameInput = findViewById(R.id.usernameInput)
             saveUsernameBtn = findViewById(R.id.saveUsernameBtn)
             accessibilityStatus = findViewById(R.id.accessibilityStatus)
@@ -55,7 +47,7 @@ class MainActivity : AppCompatActivity() {
             toggleFeaturesBtn = findViewById(R.id.toggleFeaturesBtn)
             startBtn = findViewById(R.id.startBtn)
 
-            // Handle Game Review intent from menu
+            // Handle Game Review intent
             if (intent.getBooleanExtra("openGameReview", false)) {
                 showGameReviewDialog()
             }
@@ -99,15 +91,14 @@ class MainActivity : AppCompatActivity() {
                 startOverlayAndLaunchChess()
             }
 
-            // Initial UI update
             updateUI()
-            
+
         } catch (e: Exception) {
-            // Show any other errors
+            // Show the crash error in a popup
             AlertDialog.Builder(this)
-                .setTitle("❌ App Error")
-                .setMessage("Error: ${e.message}")
-                .setPositiveButton("OK") { _, _ -> finish() }
+                .setTitle("❌ App Crashed")
+                .setMessage("Error: ${e.message}\n\nStack trace:\n${e.stackTraceToString()}")
+                .setPositiveButton("Close") { _, _ -> finish() }
                 .show()
         }
     }
