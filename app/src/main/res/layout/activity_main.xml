@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="20dp"
-    android:gravity="center"
+    android:gravity="center_horizontal"
     android:background="#0B132B">
 
     <TextView
@@ -13,9 +13,8 @@
         android:text="♛ Chess Assistant"
         android:textSize="32sp"
         android:textColor="#4CC9F0"
-        android:layout_marginBottom="40dp" />
-
-    <!-- No ImageView -->
+        android:layout_marginTop="30dp"
+        android:layout_marginBottom="30dp" />
 
     <TextView
         android:layout_width="match_parent"
@@ -81,7 +80,7 @@
         android:backgroundTint="#00FF00"
         android:textColor="#0B132B"
         android:textSize="18sp"
-        android:layout_marginTop="20dp" />
+        android:layout_marginTop="10dp" />
 
     <TextView
         android:layout_width="wrap_content"
